@@ -2,20 +2,23 @@
 
 
 SCRIPT=$(readlink -f "$0")
-# Absolute path this script is in, thus /home/user/bin
+# Absolute path this script is in
 SPATH=$(dirname "$SCRIPT")
 
 
-DICT="$SPATH/dict/2930.dic"
-LM="$SPATH/dict/2930.lm"
-
-sudo ~/pocketsphinx-5prealpha/src/programs/pocketsphinx_continuous -lm $LM -dict $DICT -inmic yes >> $SPATH/com2 &
+DICT="$SPATH/dict/9416.dic"
+LM="$SPATH/dict/9416.lm"
 
 $SPATH/testbbb > $SPATH/logs/motor &
+sleep 2
+MOTOR=$!
+sleep 5
+sudo /root/pocketsphinx-5prealpha/src/programs/pocketsphinx_continuous -lm $LM -dict $DICT -inmic yes >> $SPATH/com &
 
+sleep 6
 
-# ~/BTled/audio > ~/logaudio &
-
+$SPATH/audio > $SPATH/logs/audio &
+sleep 2
 
 
 #ok
@@ -30,4 +33,11 @@ $SPATH/audio2 > $SPATH/logs/audio2 &
 date >> logs/script
 echo -e " completed\n" >> logs/script
 
+while(ps -e | grep $MOTOR) do
+	sleep 2
+done
+
+echo "Connection lost" | festival --tts
+
+sleep 3
 
