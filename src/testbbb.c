@@ -37,22 +37,16 @@
 //***** Definition of Static Variables ************************************
 //***** Prototypes of Static Functions ************************************
 
-static void filecopy(FILE *, FILE *);
-static void removeTrigger();
-
 static void gpio_init(char pin[]);
 static void gpio_uninit(char pin[]);
 static void gpio_output(char pin[]);
-static void gpio_input(char pin[]);
 static void gpio_setvalue(char pin[], char *value);
 
 static void am33xx_pwm();
 static void pwm_init(char pin[]);
-static void pwm_uninit(char number[]);
 static void pwm_setup(char pin[], char set[], char *value);
 
 static void turnleft();
-static void turnright();
 static void go();
 static void stop();
 static void turn_around();
@@ -60,11 +54,6 @@ static void backward();
 
 static void right_forward(int dir);
 static void left_forward(int dir);
-
-static void reverse_left();
-static void reverse_right();
-
-static void circle();
 
 static void LEDChangeState(FILE *f, const char *L, int on);
 static void LEDChange(FILE *f[], const char *L[], int state);
@@ -80,6 +69,7 @@ int main(void) {
 	unsigned char buf = '\0';
 	unsigned char buf2[5] = "0";
 	int USB = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY /*| O_NDELAY*/);
+	char comm[50];
 
 	char spd[10] = L_SPEED;
 	// LEDs
@@ -94,18 +84,29 @@ int main(void) {
 
 
 	pwm_init("bone_pwm_P9_42");
+
+	usleep(500000);
+
 	pwm_init("bone_pwm_P9_22");
+
+	usleep(500000);
 	am33xx_pwm();
 
 	usleep(500000);
 
 	pwm_setup(L_PWM,"duty",L_SPEED);
+	usleep(500000);
 	pwm_setup(L_PWM,"period","10000");
+	usleep(500000);
 	pwm_setup(L_PWM,"run","0");
+	usleep(500000);
 
 	pwm_setup(R_PWM,"duty",R_SPEED);
+	usleep(500000);
 	pwm_setup(R_PWM,"period","10000");
+	usleep(500000);
 	pwm_setup(R_PWM,"run","0");
+	usleep(500000);
 
 	gpio_init(L_GPIO_1);
 	gpio_output(L_GPIO_1);
@@ -217,10 +218,6 @@ int main(void) {
 				{
 					right_forward(move);
 				}
-				else
-				{
-				//	reverse_right();
-				}
 			}
 			else if(strncmp(response,"L",1)==0) // left
 			{
@@ -229,9 +226,6 @@ int main(void) {
 				if(move > 0)
 				{
 					left_forward(move);
-				} else
-				{
-				//	reverse_left();
 				}
 			}
 			else if(strncmp(response,"S",1)==0) // stop moving forw/backw
@@ -275,13 +269,34 @@ int main(void) {
 				printf("\n");
 				LEDChange(LED,LEDB,0);
 				turn_around();
-				break;
+			}
+			else if(strncmp(response,"V",1)==0) // volume up
+			{
+				strcpy(comm, "amixer sset Speaker 10\%+");
+				system(comm);
+
+				strcpy(comm, "aplay /root/BTled/wav/up");
+				system(comm);
+			}
+			else if(strncmp(response,"v",1)==0) // volume down
+			{
+				strcpy(comm, "amixer sset Speaker 10\%-");
+				system(comm);
+
+				strcpy(comm, "aplay /root/BTled/wav/down");
+				system(comm);
+			}
+			else if(strncmp(response,"i",1)==0) // info
+			{
+				strcpy(comm, "amixer sset Speaker 10\%-");
+				system(comm);
+
 			}
 			else if(strncmp(response,"f",1)==0) // add speed
 			{
 				if(speed > 0) speed -= 500;
 				sprintf(spd, "%d", speed);
-				printf("seed: %s x00",spd);
+
 				pwm_setup(L_PWM,"duty",spd);
 				pwm_setup(R_PWM,"duty",spd);
 			}
@@ -303,16 +318,6 @@ int main(void) {
 
 
 }
-//PH****************** Copyright (c) by GC *****************************
-static void filecopy(FILE *ifp, FILE *ofp)
-{
-	int c;
-	while ((c =getc(ifp)) != EOF)
-	{
-		putc(c, ofp);
-	}
-}
-
 
 //PH****************** Copyright (c) by GC *****************************
 static void gpio_init
@@ -384,30 +389,7 @@ char pin[]				// number of GPIO pin for output set
 	printf("GPIO Out - GPIO_%s \n", pin);
 
 }
-//PH****************** Copyright (c) by GC *****************************
-static void gpio_input
-(
-char pin[]				// number of GPIO pin for input set
-)
-// * FUNCTION		: Setting input configuration for GPIO
-// *				: ( pin[] - e.g. GPIO1_31 <--> (1x32 + 31 = 63)
-// * PRECONDITION	: GPIO pin must be initialized first
-// * POSTCONDITION	: ###
-// * ERROR EXITS	: ###
-// * SIDE EFFECTS	: ###
-// ************************************************************************
-{
-	FILE *GPIOHandle = NULL;
-	char GPIOPath[50] = "/sys/class/gpio";
-	sprintf(GPIOPath, "%s/gpio%s/direction",GPIOPath, pin);
 
-	GPIOHandle = fopen(GPIOPath, "w");
-	fprintf(GPIOHandle, "in");
-	fclose(GPIOHandle);
-
-	printf("GPIO In - GPIO_%s \n", pin);
-
-}
 //PH****************** Copyright (c) by GC *****************************
 static void gpio_setvalue
 (
@@ -481,29 +463,7 @@ char pin[]			// pwm path f.e. bone_pwm_P9_22
 	printf("PWM Init - %s \n", pin);
 	printf("PWM Init end\n");
 }
-//PH****************** Copyright (c) by GC *****************************
-static void pwm_uninit
-(
-char number[]		// cat $SLOTS - check the number in system
-)
-// * FUNCTION		: Uninitialization of pwm
-// *				:
-// * PRECONDITION	: PWM must be initialized before
-// * POSTCONDITION	: ###
-// * ERROR EXITS	: ###
-// * SIDE EFFECTS	: ###
-// ************************************************************************
-{
-	FILE *PWMHandle = NULL;
-	char *SLOTS = "/sys/devices/bone_capemgr.9/slots";
 
-	PWMHandle = fopen(SLOTS, "w");
-	fprintf(PWMHandle, "-%s", number);
-	fclose(PWMHandle);
-
-	printf("PWM Uninit - %s \n", number);
-	printf("PWM Uninit end\n");
-}
 //PH****************** Copyright (c) by GC *****************************
 static void pwm_setup
 (
@@ -550,20 +510,7 @@ static void turnleft()
 
 	//reverse_left();
 }
-//PH****************** Copyright (c) by GC *****************************
-static void turnright()
-// * FUNCTION		: Turning right with the motors
-// *				:
-// * PRECONDITION	: PWM must be initialized before
-// * POSTCONDITION	: ###
-// * ERROR EXITS	: ###
-// * SIDE EFFECTS	: ###
-// ************************************************************************
-{
-	//lewy 1, prawy 0
-	pwm_setup(R_PWM,"run","0");
-	pwm_setup(L_PWM,"run", "1");
-}
+
 //PH****************** Copyright (c) by GC *****************************
 static void go()
 // * FUNCTION		: Both motors on
@@ -623,34 +570,6 @@ static void backward() // go backward
 	pwm_setup(L_PWM,"run", "1");
 }
 
-static void reverse_left() // turn left without moving
-{
-	GPIOChange(110);
-
-	pwm_setup(L_PWM,"duty","6100");
-	pwm_setup(R_PWM,"duty","6100");
-
-
-	pwm_setup(R_PWM,"run","1");
-	pwm_setup(L_PWM,"run", "1");
-}
-
-
-
-static void reverse_right() // turn right without moving
-{
-	gpio_setvalue(L_GPIO_1,"1"); // left
-	gpio_setvalue(L_GPIO_2,"0");
-	gpio_setvalue(R_GPIO_1,"0"); // right
-	gpio_setvalue(R_GPIO_2,"1");
-
-	pwm_setup(L_PWM,"duty","6100");
-	pwm_setup(R_PWM,"duty","6100");
-
-	pwm_setup(R_PWM,"run","1");
-	pwm_setup(L_PWM,"run", "1");
-}
-
 static void right_forward(int dir) // turn right while going forw/backw
 {
 	if(dir == 2)
@@ -683,37 +602,6 @@ static void left_forward(int dir)
 
 	//pwm_setup(R_PWM,"run","1");
 	//pwm_setup(L_PWM,"run", "1");
-}
-
-
-
-//PH****************** Copyright (c) by GC *****************************
-static void circle()
-// * FUNCTION		: Circle for test motors
-// *				:
-// * PRECONDITION	: PWM must be initialized before
-// * POSTCONDITION	: ###
-// * ERROR EXITS	: ###
-// * SIDE EFFECTS	: ###
-// ************************************************************************
-{
-	go();
-	sleep(1);
-	turnleft();
-	sleep(1);
-	go();
-	sleep(1);
-	turnleft();
-	sleep(1);
-	go();
-	sleep(1);
-	turnleft();
-	sleep(1);
-	go();
-	sleep(1);
-	turnleft();
-	sleep(1);
-	stop();
 }
 
 void LEDChangeState(FILE *f, const char *L, int on)
