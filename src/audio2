@@ -1,0 +1,186 @@
+//MH****************** Copyright (c) by GC *****************************
+// Filename 		: init1.c
+// Owner			: Gigaset Communications Polska Sp. z o.o.
+//-------------------------------------------------------------------------
+// Function			: Initialization of BeagleBone Black's ports -gpio(62,63), pwm(42,22)
+// Special cases	: Only for Debian Embedded version BeagleBone Black Board
+//-------------------------------------------------------------------------
+//*************************************************************************
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <termios.h>
+#include <poll.h>
+#include <stropts.h>
+#include <sys/types.h>
+
+//***** Module Specific Defines and Enums *********************************
+//***** Module Specific Macros and Typedefs *******************************
+//***** Definition of Global Variables ************************************
+
+#define L_PWM 		"pwm_test_P9_42.15"
+#define R_PWM 		"pwm_test_P9_22.16"
+#define L_GPIO 		"/sys/class/gpio/gpio49"
+
+#define L_GPIO_1	"27"
+#define L_GPIO_2	"46"
+#define R_GPIO_1	"44"
+#define R_GPIO_2	"45"
+
+#define L_SPEED		"7500"
+#define R_SPEED		"7500"
+
+//***** Definition of Static Variables ************************************
+//***** Prototypes of Static Functions ************************************
+
+static int gpio_getvalue(char pin[]);
+static int pwm_getvalue(char pin[]);
+
+int main(void) {
+
+	char comm[50];
+
+	//usleep(500000);
+
+	char text[100];
+	FILE *Handler = NULL;
+	char path[50] = "/root/BTled/com";
+
+	int last = 0;
+	while(1)
+	{
+		strcpy(text, "\0");
+
+		if((Handler = fopen(path, "r")) != NULL)
+		{
+			fgets(text, 100, Handler);
+			fclose(Handler);
+			usleep(1000);
+			fclose(fopen(path,"w"));
+		}
+
+		printf("test:%s.\n", text);
+		if( strncmp(text, "TURN AROUND\n", 20) == 0 )
+			{
+				printf("four\n");
+				strcpy(comm, "echo \"turning around\" | festival --tts");
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "LEFT MOTOR\n", 20) == 0 )
+			{
+				printf("four\n");
+				sprintf(comm, "echo \"Duty of left motor is %d\" | festival --tts", pwm_getvalue(L_PWM));
+				//strcpy(comm, "echo \"turning around\" | festival --tts");
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "RIGHT MOTOR\n", 20) == 0 )
+			{
+				printf("four\n");
+				sprintf(comm, "echo \"Duty of right motor is %d\" | festival --tts", pwm_getvalue(R_PWM));
+				//strcpy(comm, "echo \"turning around\" | festival --tts");
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "TALK TO ME\n", 10) == 0 )
+			{
+				printf("four\n");
+				sprintf(comm, "~/BTled/audio &");
+				//strcpy(comm, "echo \"turning around\" | festival --tts");
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "STOP\n", 4) == 0 )
+			{
+				printf("four\n");
+				sprintf(comm, "echo 1 > ~/BTled/status");
+				//strcpy(comm, "echo \"turning around\" | festival --tts");
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "CLOCKWISE\n", 8) == 0 )
+			{
+				printf("clockwise\n");
+				sprintf(comm, "echo 1 > ~/BTled/status");
+				//strcpy(comm, "echo \"turning around\" | festival --tts");
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "INFO\n", 4) == 0 )
+			{
+				printf("info\n");
+				sprintf(comm, "echo \"Duty of right motor is %d and Duty of left motor is %d\" | festival --tts", pwm_getvalue(R_PWM), pwm_getvalue(L_PWM));
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "REBOOT\n", 5) == 0 )
+			{
+				strcpy(comm, "echo \"rebooting\" | festival --tts");
+				printf("%s", comm);
+				system(comm);
+
+				strcpy(comm, "reboot");
+				printf("%s", comm);
+				system(comm);
+			}
+		else if( strncmp(text, "5", 1) == 0) printf("five\n");
+		else if( strncmp(text, "6", 1) == 0 ) printf("six\n");
+
+		usleep(1000000);
+	}
+
+}
+
+static int gpio_getvalue(char pin[])
+{
+	static char value[10];
+
+	FILE *GPIOHandle = NULL;
+	char GPIOPath[50] = "/sys/class/gpio";
+	sprintf(GPIOPath, "%s/gpio%s/value",GPIOPath, pin);
+	GPIOHandle = fopen(GPIOPath, "r");
+	fscanf(GPIOHandle, "%s", value);
+	fclose(GPIOHandle);
+
+	if(strncmp(value,"1",1)==0)
+		return 1;
+	else if(strncmp(value,"0",1)==0)
+		return 0;
+	else return -1; //error
+
+
+}
+
+static int pwm_getvalue(char pin[])
+{
+
+	static char value[10];
+
+	FILE *GPIOHandle = NULL;
+
+	char GPIOPath[80] = "/sys/devices/ocp.3";
+	sprintf(GPIOPath, "%s/%s/duty",GPIOPath, pin);
+
+
+	GPIOHandle = fopen(GPIOPath, "r");
+	fscanf(GPIOHandle, "%s", value);
+	fclose(GPIOHandle);
+
+	int ret = -2;
+
+	ret = atoi(value);
+	return ret;
+	/*if(strncmp(value,"1",1)==0)
+		return 1;
+	else if(strncmp(value,"0",1)==0)
+		return 0;
+	else return -1; //error
+*/
+}
+
+
