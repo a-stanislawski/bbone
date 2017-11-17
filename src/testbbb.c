@@ -46,6 +46,8 @@ static void am33xx_pwm();
 static void pwm_init(char pin[]);
 static void pwm_setup(char pin[], char set[], char *value);
 
+static int getVoltage();
+
 static void turnleft();
 static void go();
 static void stop();
@@ -292,6 +294,12 @@ int main(void) {
 				system(comm);
 
 			}
+			else if(strncmp(response,"x",1)==0) // info
+			{
+				sprintf(comm, "echo \"Current voltage of battery is %d point %d volts\" | festival --tts", 3 + getVoltage()/1000, getVoltage()%1000);
+				system(comm);
+
+			}
 			else if(strncmp(response,"f",1)==0) // add speed
 			{
 				if(speed > 0) speed -= 500;
@@ -317,6 +325,20 @@ int main(void) {
 	gpio_uninit(R_GPIO_2);
 
 
+}
+
+static int getVoltage()
+{
+	static char value[10];
+
+	FILE *GPIOHandle = NULL;
+	char GPIOPath[50] = "/sys/devices/ocp.3/helper.17";
+	sprintf(GPIOPath, "%s/AIN6",GPIOPath);
+	GPIOHandle = fopen(GPIOPath, "r");
+	fscanf(GPIOHandle, "%s", value);
+	fclose(GPIOHandle);
+
+	return atoi(value);
 }
 
 //PH****************** Copyright (c) by GC *****************************
