@@ -240,7 +240,7 @@ int main(void) {
 				strcpy(comm, "amixer sset Speaker 10\%+");
 				system(comm);
 
-				strcpy(comm, "aplay /root/BTled/wav/up &");
+				strcpy(comm, "aplay /root/BTled/wav/up.wav &");
 				system(comm);
 			}
 			else if(strncmp(response,"v",1)==0) // volume down
@@ -248,7 +248,7 @@ int main(void) {
 				strcpy(comm, "amixer sset Speaker 5\%-");
 				system(comm);
 
-				strcpy(comm, "aplay /root/BTled/wav/down &");
+				strcpy(comm, "aplay /root/BTled/wav/down.wav &");
 				system(comm);
 			}
 			else if(strncmp(response,"i",1)==0) // info
