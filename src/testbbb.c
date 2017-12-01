@@ -18,15 +18,13 @@
 #include <stropts.h>
 #include <sys/types.h>
 
-#include "led.c"
-#include "bb_functions.c"
 
 //***** Module Specific Defines and Enums *********************************
 //***** Module Specific Macros and Typedefs *******************************
 //***** Definition of Global Variables ************************************
 
-#define L_PWM 		"pwm_test_P9_42.15"
-#define R_PWM 		"pwm_test_P9_22.16"
+#define L_PWM 		"pwm_test_P9_42.12"
+#define R_PWM 		"pwm_test_P9_22.13"
 #define L_GPIO 		"/sys/class/gpio/gpio49"
 
 #define L_GPIO_1	"27"
@@ -54,6 +52,16 @@ static void backward();
 static void right_forward(int dir);
 static void left_forward(int dir);
 
+static void LEDChangeState(FILE *f, const char *L, int on);
+static void LEDChange(FILE *f[], const char *L[], int state);
+
+
+static void am33xx_pwm();
+static void pwm_init(char pin[]);
+static void gpio_init(char pin[]);
+static void gpio_uninit(char pin[]);
+static void gpio_output(char pin[]);
+
 static int move = 0; // 0 - stop, 1 - going backwards, 2 - going forwards
 static int speed = 7500;
 
@@ -63,7 +71,7 @@ int main(void) {
 	int n = 0;
 	unsigned char buf = '\0';
 	int USB = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY /*| O_NDELAY*/);
-	char comm[50];
+	char comm[250];
 
 	char spd[10] = L_SPEED;
 	// LEDs
@@ -264,6 +272,31 @@ int main(void) {
 				sprintf(comm, "echo \" %d point %d volts\" | festival --tts", 3 + getVoltage()/1000, getVoltage()%1000);
 				system(comm);
 			}
+
+
+			else if(strncmp(response,"q",1)==0) // mic
+			{
+				LEDChange(LED,LEDB,10001);
+				strcpy(comm, "arecord -f S16_LE -r 16000 -d 3 /root/abc");
+				system(comm);
+				LEDChange(LED,LEDB,10000);
+
+				sprintf(comm, "/root/pocketsphinx-5prealpha1/src/programs/pocketsphinx_continuous -lm /root/pocketsphinx-5prealpha1/src/programs/4749.lm -dict /root/pocketsphinx-5prealpha1/src/programs/4749.dic -infile /root/abc &");
+				system(comm);
+			}
+
+			else if(strncmp(response,"Q",1)==0) // update date
+			{
+				strcpy(comm, "ifup wlan0 &");
+				system(comm);
+
+				strcpy(comm, "ntpdate -b -s -u pool.ntp.org");
+				system(comm);
+				strcpy(comm, "aplay /root/BTled/wav/updated &");
+				system(comm);
+			}
+
+
 			else if(strncmp(response,"f",1)==0) // add speed
 			{
 				if(speed > 0) speed -= 500;
@@ -294,7 +327,7 @@ static int getVoltage()
 	static char value[10];
 
 	FILE *GPIOHandle = NULL;
-	char GPIOPath[50] = "/sys/devices/ocp.3/helper.17";
+	char GPIOPath[50] = "/sys/devices/ocp.3/helper.14";
 	sprintf(GPIOPath, "%s/AIN6",GPIOPath);
 	GPIOHandle = fopen(GPIOPath, "r");
 	fscanf(GPIOHandle, "%s", value);
@@ -473,3 +506,154 @@ static void GPIOChange(int gpio) // L1, L2, R1, R2
 	else
 		gpio_setvalue(L_GPIO_1,"0");
 }
+
+
+//PH****************** Copyright (c) by GC *****************************
+static void gpio_init
+(
+char pin[]			//number of initialized pin
+)
+// * FUNCTION		: Initialization of GPIO
+// *				: (e.g. GPIO1_31 <--> (1x32 + 31 = 63)
+// * PRECONDITION	: ###
+// * POSTCONDITION	: ###
+// * ERROR EXITS	: ###
+// * SIDE EFFECTS	: ###
+// ************************************************************************
+{
+
+	FILE *GPIOHandle = NULL;
+	char *GPIOPath = "/sys/class/gpio/export";
+	GPIOHandle = fopen(GPIOPath, "w");
+	fprintf(GPIOHandle, "%s", pin);
+	fclose(GPIOHandle);
+
+	printf("GPIO Init - GPIO_%s \n", pin);
+	printf("GPIO Init end\n");
+
+}
+//PH****************** Copyright (c) by GC *****************************
+static void gpio_uninit
+(
+char pin[]			//number of uninitialized pin
+)
+// * FUNCTION		: Uninitialization of GPIO
+// *				: (e.g. GPIO1_31 <--> (1x32 + 31 = 63)
+// * PRECONDITION	: ###
+// * POSTCONDITION	: ###
+// * ERROR EXITS	: ###
+// * SIDE EFFECTS	: ###
+// ************************************************************************
+{
+	FILE *GPIOHandle = NULL;
+	char *GPIOPath = "/sys/class/gpio/unexport";
+	GPIOHandle = fopen(GPIOPath, "w");
+	fprintf(GPIOHandle, "%s", pin);
+	fclose(GPIOHandle);
+
+	printf("GPIO Uninit - GPIO_%s - unexported\n", pin);
+	printf("GPIO Uninit end \n");
+}
+
+//PH****************** Copyright (c) by GC *****************************
+static void am33xx_pwm()
+// * FUNCTION		: Initialization of am33xx_pwm
+// *				:
+// * PRECONDITION	: ###
+// * POSTCONDITION	: ###
+// * ERROR EXITS	: ###
+// * SIDE EFFECTS	: ###
+// ************************************************************************
+{
+	//pin - f.e. bone_pwm_P9_22
+	//pin bone_pwm_P9_42
+	FILE *PWMHandle = NULL;
+	char *SLOTS = "/sys/devices/bone_capemgr.9/slots";
+
+	PWMHandle = fopen(SLOTS, "w");
+	fprintf(PWMHandle, "am33xx_pwm");
+	fclose(PWMHandle);
+
+	printf("am33xx_pwm Init end\n");
+}
+//PH****************** Copyright (c) by GC *****************************
+static void pwm_init
+(
+char pin[]			// pwm path f.e. bone_pwm_P9_22
+)
+// * FUNCTION		: Initialization of pwm
+// *				:
+// * PRECONDITION	: ###
+// * POSTCONDITION	: ###
+// * ERROR EXITS	: ###
+// * SIDE EFFECTS	: ###
+// ************************************************************************
+{
+	FILE *PWMHandle = NULL;
+	char *SLOTS = "/sys/devices/bone_capemgr.9/slots";
+
+	PWMHandle = fopen(SLOTS, "w");
+	fprintf(PWMHandle, "%s", pin);
+	fclose(PWMHandle);
+
+	printf("PWM Init - %s \n", pin);
+	printf("PWM Init end\n");
+}
+
+static void gpio_output
+(
+char pin[]				// number of GPIO pin for output set
+)
+// * FUNCTION		: Setting output configuration for GPIO
+// *				: ( pin[] - e.g. GPIO1_31 <--> (1x32 + 31 = 63)
+// * PRECONDITION	: GPIO pin must be initialized first
+// * POSTCONDITION	: ###
+// * ERROR EXITS	: ###
+// * SIDE EFFECTS	: ###
+// ************************************************************************
+{
+	FILE *GPIOHandle = NULL;
+	char GPIOPath[50] = "/sys/class/gpio";
+	sprintf(GPIOPath, "%s/gpio%s/direction",GPIOPath, pin);
+
+	GPIOHandle = fopen(GPIOPath, "w");
+	fprintf(GPIOHandle, "out");
+	fclose(GPIOHandle);
+
+	printf("GPIO Out - GPIO_%s \n", pin);
+
+}
+
+
+void LEDChangeState(FILE *f, const char *L, int on)
+{
+	if(on){
+		if((f = fopen(L, "r+")) != NULL){
+			fwrite("1", sizeof(char), 1, f);
+			fclose(f);
+	 	}
+	} else
+	{
+		if((f = fopen(L, "r+")) != NULL){
+			fwrite("0", sizeof(char), 1, f);
+			fclose(f);
+	 	}
+	}
+}
+
+void LEDChange(FILE *f[], const char *L[], int state) // L1, L2, R2, R1
+{
+	if(state >= 10000)
+	{
+		LEDChangeState(f[0], L[0], state % 10);
+		LEDChangeState(f[1], L[1], (state/10) % 10);
+		LEDChangeState(f[2], L[2], (state/100) % 10);
+		LEDChangeState(f[3], L[3], (state/1000) % 10);
+
+	} else return;
+	LEDChangeState(f[0], L[0], state % 10);
+	LEDChangeState(f[1], L[1], (state/10) % 10);
+	LEDChangeState(f[2], L[2], (state/100) % 10);
+	LEDChangeState(f[3], L[3], (state/1000) % 10);
+}
+
